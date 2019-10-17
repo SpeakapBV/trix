@@ -1,7 +1,7 @@
 
 /*
 Trix 0.9.2
-Copyright © 2015 Basecamp, LLC
+Copyright © 2019 Basecamp, LLC
 http://trix-editor.org/
  */
 
@@ -1389,11 +1389,21 @@ http://trix-editor.org/
   Trix.config.textAttributes = {
     bold: {
       tagName: "b",
-      inheritable: true
+      inheritable: true,
+      parser: function(element) {
+        var style;
+        style = window.getComputedStyle(element);
+        return (style["fontWeight"] === "bold" || style["fontWeight"] >= 600) && style["fontSize"] === "12px";
+      }
     },
     italic: {
       tagName: "i",
-      inheritable: true
+      inheritable: true,
+      parser: function(element) {
+        var style;
+        style = window.getComputedStyle(element);
+        return style["fontStyle"] === "italic";
+      }
     },
     href: {
       groupTagName: "a",
@@ -1410,7 +1420,12 @@ http://trix-editor.org/
     },
     underline: {
       tagName: "u",
-      inheritable: true
+      inheritable: true,
+      parser: function(element) {
+        var style;
+        style = window.getComputedStyle(element);
+        return /underline/.test(style["textDecoration"]);
+      }
     },
     frozen: {
       style: {
