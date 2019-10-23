@@ -9319,7 +9319,7 @@ window.CustomElements.addModule(function(scope) {
     };
 
     SelectionManager.prototype.getLocationRangeAtPoint = function(arg) {
-      var domRange, offset, offsetNode, originalDOMRange, ref, textRange, x, y;
+      var domRange, offset, offsetNode, ref, x, y;
       x = arg.x, y = arg.y;
       if (document.caretPositionFromPoint) {
         ref = document.caretPositionFromPoint(x, y), offsetNode = ref.offsetNode, offset = ref.offset;
@@ -9328,16 +9328,13 @@ window.CustomElements.addModule(function(scope) {
       } else if (document.caretRangeFromPoint) {
         domRange = document.caretRangeFromPoint(x, y);
       } else if (document.body.createTextRange) {
-        originalDOMRange = getDOMRange();
         try {
-          textRange = document.body.createTextRange();
-          textRange.moveToPoint(x, y);
-          textRange.select();
+          domRange = document.body.createTextRange();
+          domRange.moveToPoint(clientX, clientY);
+          domRange.select();
         } catch (_error) {}
-        domRange = getDOMRange();
-        setDOMRange(originalDOMRange);
       }
-      return this.createLocationRangeFromDOMRange(domRange);
+      return this.createLocationRangeFromDOMRange(domRange != null ? domRange : getDOMRange());
     };
 
     cursorPositionPlaceholder = makeElement({
