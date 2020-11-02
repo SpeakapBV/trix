@@ -1,7 +1,7 @@
 
 /*
 Trix 0.9.2
-Copyright © 2019 Basecamp, LLC
+Copyright © 2020 Basecamp, LLC
 http://trix-editor.org/
  */
 
@@ -3294,6 +3294,7 @@ window.CustomElements.addModule(function(scope) {
       var eventName;
       this.element = element1;
       this.resetInputSummary();
+      this.mutationCount = 0;
       this.mutationObserver = new Trix.MutationObserver(this.element);
       this.mutationObserver.delegate = this;
       for (eventName in this.events) {
@@ -3349,6 +3350,7 @@ window.CustomElements.addModule(function(scope) {
     };
 
     InputController.prototype.elementDidMutate = function(mutationSummary) {
+      this.mutationCount++;
       if (!this.inputSummary.composing) {
         return this.handleInput(function() {
           var ref;
@@ -3375,6 +3377,18 @@ window.CustomElements.addModule(function(scope) {
           return !(unhandledAddition || unhandledDeletion);
         }
       }
+    };
+
+    InputController.prototype.unlessMutationOccurs = function(callback) {
+      var mutationCount;
+      mutationCount = this.mutationCount;
+      return defer((function(_this) {
+        return function() {
+          if (mutationCount === _this.mutationCount) {
+            return callback();
+          }
+        };
+      })(this));
     };
 
     InputController.prototype.attachFiles = function(files) {
@@ -3646,55 +3660,75 @@ window.CustomElements.addModule(function(scope) {
         return event.preventDefault();
       },
       compositionstart: function(event) {
-        var ref, textAdded;
-        if (!this.selectionIsExpanded()) {
-          if (!(this.inputSummary.eventName === "keypress" && this.inputSummary.textAdded)) {
-            textAdded = (ref = this.responder) != null ? ref.insertPlaceholder() : void 0;
-            this.setInputSummary({
-              textAdded: textAdded
-            });
-            this.requestRender();
+        var compositionRange, ref, ref1, ref2;
+        if (this.inputSummary.eventName === "keypress" && this.inputSummary.textAdded) {
+          if ((ref = this.responder) != null) {
+            ref.deleteInDirection("left");
           }
         }
+        if (!this.selectionIsExpanded()) {
+          if ((ref1 = this.responder) != null) {
+            ref1.insertPlaceholder();
+          }
+          this.requestRender();
+        }
+        compositionRange = (ref2 = this.responder) != null ? ref2.getSelectedRange() : void 0;
         return this.setInputSummary({
-          composing: true,
-          compositionStart: event.data
+          compositionRange: compositionRange,
+          compositionStart: event.data,
+          composing: true
         });
       },
       compositionupdate: function(event) {
-        var ref, ref1;
-        if ((ref = this.responder) != null ? ref.selectPlaceholder() : void 0) {
+        var compositionRange, ref, ref1;
+        if (compositionRange = (ref = this.responder) != null ? ref.selectPlaceholder() : void 0) {
+          this.setInputSummary({
+            compositionRange: compositionRange
+          });
           if ((ref1 = this.responder) != null) {
             ref1.forgetPlaceholder();
           }
         }
         return this.setInputSummary({
-          composing: true,
           compositionUpdate: event.data
         });
       },
       compositionend: function(event) {
-        var added, compositionStart, data, ref, ref1, ref2, ref3, ref4, removed;
-        if ((ref = this.responder) != null ? ref.selectPlaceholder() : void 0) {
-          if ((ref1 = this.responder) != null) {
-            ref1.forgetPlaceholder();
-          }
+        var compositionEnd, compositionRange, compositionStart, compositionUpdate, ref, ref1, ref2, ref3, ref4;
+        compositionEnd = event.data;
+        ref = this.inputSummary, compositionStart = ref.compositionStart, compositionUpdate = ref.compositionUpdate, compositionRange = ref.compositionRange;
+        if ((ref1 = this.responder) != null) {
+          ref1.forgetPlaceholder();
         }
-        compositionStart = this.inputSummary.compositionStart;
-        data = event.data;
-        if ((compositionStart != null) && (data != null) && compositionStart !== data) {
+        this.setInputSummary({
+          composing: false
+        });
+        if ((compositionStart != null) && (compositionRange != null)) {
           if ((ref2 = this.delegate) != null) {
             ref2.inputControllerWillPerformTyping();
           }
           if ((ref3 = this.responder) != null) {
-            ref3.insertString(data);
+            ref3.setSelectedRange(compositionRange);
           }
-          ref4 = summarizeStringChange(compositionStart, data), added = ref4.added, removed = ref4.removed;
-          return this.setInputSummary({
-            composing: false,
-            textAdded: added,
-            didDelete: Boolean(removed)
+          if ((ref4 = this.responder) != null) {
+            ref4.insertString(compositionEnd);
+          }
+          this.setInputSummary({
+            preferDocument: true
           });
+          if (compositionEnd === compositionUpdate) {
+            return this.unlessMutationOccurs((function(_this) {
+              return function() {
+                var ref5;
+                if (_this.selectionIsExpanded()) {
+                  if ((ref5 = _this.responder) != null) {
+                    ref5.setSelection(compositionRange[1]);
+                  }
+                  return _this.requestRender();
+                }
+              };
+            })(this));
+          }
         }
       },
       input: function(event) {
@@ -7680,14 +7714,13 @@ window.CustomElements.addModule(function(scope) {
 
     Composition.prototype.insertPlaceholder = function() {
       this.placeholderPosition = this.getPosition();
-      this.insertString(placeholder);
-      return placeholder;
+      return this.insertString(placeholder);
     };
 
     Composition.prototype.selectPlaceholder = function() {
       if (this.placeholderPosition != null) {
         this.setSelectedRange([this.placeholderPosition, this.placeholderPosition + placeholder.length]);
-        return true;
+        return this.getSelectedRange();
       }
     };
 
