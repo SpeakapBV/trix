@@ -21,6 +21,7 @@ class Trix.InputController extends Trix.BasicObject
   constructor: (@element) ->
     @resetInputSummary()
 
+    @mutationCount = 0
     @mutationObserver = new Trix.MutationObserver @element
     @mutationObserver.delegate = this
 
@@ -56,6 +57,7 @@ class Trix.InputController extends Trix.BasicObject
   # Mutation observer delegate
 
   elementDidMutate: (mutationSummary) ->
+    @mutationCount++
     unless @inputSummary.composing
       @handleInput ->
         unless @mutationIsExpected(mutationSummary)
@@ -73,6 +75,12 @@ class Trix.InputController extends Trix.BasicObject
         unhandledAddition = mutationSummary.textAdded isnt @inputSummary.textAdded
         unhandledDeletion = mutationSummary.textDeleted? and not @inputSummary.didDelete
         not (unhandledAddition or unhandledDeletion)
+
+  unlessMutationOccurs: (callback) ->
+    mutationCount = @mutationCount
+    defer =>
+      if mutationCount is @mutationCount
+        callback()
 
   # File verification
 
@@ -225,33 +233,45 @@ class Trix.InputController extends Trix.BasicObject
       event.preventDefault()
 
     compositionstart: (event) ->
-      unless @selectionIsExpanded()
-        # Skip placeholder if keypress input was received before the composition started
-        unless @inputSummary.eventName is "keypress" and @inputSummary.textAdded
-          textAdded = @responder?.insertPlaceholder()
-          @setInputSummary({textAdded})
-          @requestRender()
+      if @inputSummary.eventName is "keypress" and @inputSummary.textAdded
+        @responder?.deleteInDirection("left")
 
-      @setInputSummary(composing: true, compositionStart: event.data)
+      unless @selectionIsExpanded()
+        @responder?.insertPlaceholder()
+        @requestRender()
+
+      compositionRange = @responder?.getSelectedRange()
+      @setInputSummary({compositionRange, compositionStart: event.data, composing: true})
 
     compositionupdate: (event) ->
-      if @responder?.selectPlaceholder()
+      if compositionRange = @responder?.selectPlaceholder()
+        @setInputSummary({compositionRange})
         @responder?.forgetPlaceholder()
 
-      @setInputSummary(composing: true, compositionUpdate: event.data)
+      @setInputSummary(compositionUpdate: event.data)
 
     compositionend: (event) ->
-      if @responder?.selectPlaceholder()
-        @responder?.forgetPlaceholder()
+      compositionEnd = event.data
+      {compositionStart, compositionUpdate, compositionRange} = @inputSummary
 
-      {compositionStart} = @inputSummary
-      {data} = event
+      @responder?.forgetPlaceholder()
+      @setInputSummary(composing: false)
 
-      if compositionStart? and data? and compositionStart isnt data
+      if compositionStart? and compositionRange?
         @delegate?.inputControllerWillPerformTyping()
-        @responder?.insertString(data)
-        {added, removed} = summarizeStringChange(compositionStart, data)
-        @setInputSummary(composing: false, textAdded: added, didDelete: Boolean(removed))
+        @responder?.setSelectedRange(compositionRange)
+        @responder?.insertString(compositionEnd)
+        @setInputSummary(preferDocument: true)
+
+        # Fix for compositions remaining selected in Firefox:
+        # If the last composition update is the same as the final composition then
+        # it's likely there won't be another mutation (and subsequent render + selection change).
+        # In that case, collapse the selection and request a render.
+        if compositionEnd is compositionUpdate
+          @unlessMutationOccurs =>
+            if @selectionIsExpanded()
+              @responder?.setSelection(compositionRange[1])
+              @requestRender()
 
     input: (event) ->
       event.stopPropagation()
