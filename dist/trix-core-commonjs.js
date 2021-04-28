@@ -7,7 +7,7 @@
 
 }).call(this);
 (function() {
-  this.Trix = {
+  window.Trix= {
     VERSION: "",
     ZERO_WIDTH_SPACE: "\uFEFF",
     NON_BREAKING_SPACE: "\u00A0",

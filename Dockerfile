@@ -30,8 +30,4 @@ RUN gem install bundler -v '1.17.2'
 
 WORKDIR /opt/speakap_trix
 
-COPY . .
-RUN bundle install
-RUN bin/blade build
-
-CMD ["ls", "dist"]
+CMD ["./build-speakap.sh"]
