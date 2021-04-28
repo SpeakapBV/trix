@@ -8,6 +8,6 @@ gem 'eco'
 gem 'sass'
 gem 'uglifier'
 
-gem 'blade', github: 'javan/blade'
-gem 'blade-sauce_labs_plugin', github: 'javan/blade-sauce_labs_plugin'
+gem 'blade', github: 'javan/blade', branch: 'main'
+gem 'blade-sauce_labs_plugin', github: 'javan/blade-sauce_labs_plugin', branch: 'main'
 gem 'github_api'
