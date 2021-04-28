@@ -1,8 +1,5 @@
 
 /*
-Trix 0.9.2
-Copyright © 2020 Basecamp, LLC
-http://trix-editor.org/
  */
 
 (function() {
@@ -1230,7 +1227,7 @@ window.CustomElements.addModule(function(scope) {
 }).call(this);
 (function() {
   this.Trix = {
-    VERSION: "0.9.2",
+    VERSION: "",
     ZERO_WIDTH_SPACE: "\uFEFF",
     NON_BREAKING_SPACE: "\u00A0",
     OBJECT_REPLACEMENT_CHARACTER: "\uFFFC",
