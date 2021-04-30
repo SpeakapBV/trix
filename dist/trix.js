@@ -1446,24 +1446,17 @@ window.CustomElements.addModule(function(scope) {
 }).call(this);
 (function() {
   Trix.extend({
-    arraysAreEqual: function(a, b) {
-      var i, index, len, value;
-      if (a == null) {
-        a = [];
+    copyObject: function(object) {
+      var key, result, value;
+      if (object == null) {
+        object = {};
       }
-      if (b == null) {
-        b = [];
+      result = {};
+      for (key in object) {
+        value = object[key];
+        result[key] = value;
       }
-      if (a.length !== b.length) {
-        return false;
-      }
-      for (index = i = 0, len = a.length; i < len; index = ++i) {
-        value = a[index];
-        if (value !== b[index]) {
-          return false;
-        }
-      }
-      return true;
+      return result;
     },
     objectsAreEqual: function(a, b) {
       var key, value;
@@ -1479,6 +1472,30 @@ window.CustomElements.addModule(function(scope) {
       for (key in a) {
         value = a[key];
         if (value !== b[key]) {
+          return false;
+        }
+      }
+      return true;
+    }
+  });
+
+}).call(this);
+(function() {
+  Trix.extend({
+    arraysAreEqual: function(a, b) {
+      var i, index, len, value;
+      if (a == null) {
+        a = [];
+      }
+      if (b == null) {
+        b = [];
+      }
+      if (a.length !== b.length) {
+        return false;
+      }
+      for (index = i = 0, len = a.length; i < len; index = ++i) {
+        value = a[index];
+        if (value !== b[index]) {
           return false;
         }
       }
@@ -1785,6 +1802,150 @@ window.CustomElements.addModule(function(scope) {
 
 }).call(this);
 (function() {
+  var copyObject, copyValue, normalizeRange, objectsAreEqual, rangeValuesAreEqual;
+
+  copyObject = Trix.copyObject, objectsAreEqual = Trix.objectsAreEqual;
+
+  Trix.extend({
+    normalizeRange: normalizeRange = function(range) {
+      var ref;
+      if (range == null) {
+        return;
+      }
+      if (!Array.isArray(range)) {
+        range = [range, range];
+      }
+      return [copyValue(range[0]), copyValue((ref = range[1]) != null ? ref : range[0])];
+    },
+    rangeIsCollapsed: function(range) {
+      var end, ref, start;
+      if (range == null) {
+        return;
+      }
+      ref = normalizeRange(range), start = ref[0], end = ref[1];
+      return rangeValuesAreEqual(start, end);
+    },
+    rangesAreEqual: function(leftRange, rightRange) {
+      var leftEnd, leftStart, ref, ref1, rightEnd, rightStart;
+      if (!((leftRange != null) && (rightRange != null))) {
+        return;
+      }
+      ref = normalizeRange(leftRange), leftStart = ref[0], leftEnd = ref[1];
+      ref1 = normalizeRange(rightRange), rightStart = ref1[0], rightEnd = ref1[1];
+      return rangeValuesAreEqual(leftStart, rightStart) && rangeValuesAreEqual(leftEnd, rightEnd);
+    }
+  });
+
+  copyValue = function(value) {
+    if (typeof value === "number") {
+      return value;
+    } else {
+      return copyObject(value);
+    }
+  };
+
+  rangeValuesAreEqual = function(left, right) {
+    if (typeof left === "number") {
+      return left === right;
+    } else {
+      return objectsAreEqual(left, right);
+    }
+  };
+
+}).call(this);
+(function() {
+  var defaults, insertStyleElementForTagName, installDefaultCSSForTagName, rewriteFunctionsAsValues;
+
+  defaults = {
+    extendsTagName: "div",
+    css: "%t { display: block; }"
+  };
+
+  Trix.registerElement = function(tagName, definition) {
+    var constructor, defaultCSS, extendedPrototype, extendsTagName, properties, prototype, ref;
+    if (definition == null) {
+      definition = {};
+    }
+    tagName = tagName.toLowerCase();
+    properties = rewriteFunctionsAsValues(definition);
+    extendsTagName = (ref = properties.extendsTagName) != null ? ref : defaults.extendsTagName;
+    delete properties.extendsTagName;
+    defaultCSS = properties.defaultCSS;
+    delete properties.defaultCSS;
+    if ((defaultCSS != null) && extendsTagName === defaults.extendsTagName) {
+      defaultCSS += "\n" + defaults.css;
+    } else {
+      defaultCSS = defaults.css;
+    }
+    installDefaultCSSForTagName(defaultCSS, tagName);
+    extendedPrototype = Object.getPrototypeOf(document.createElement(extendsTagName));
+    extendedPrototype.__super__ = extendedPrototype;
+    prototype = Object.create(extendedPrototype, properties);
+    constructor = document.registerElement(tagName, {
+      prototype: prototype
+    });
+    Object.defineProperty(prototype, "constructor", {
+      value: constructor
+    });
+    return constructor;
+  };
+
+  installDefaultCSSForTagName = function(defaultCSS, tagName) {
+    var styleElement;
+    styleElement = insertStyleElementForTagName(tagName);
+    return styleElement.textContent = defaultCSS.replace(/%t/g, tagName);
+  };
+
+  insertStyleElementForTagName = function(tagName) {
+    var element;
+    element = document.createElement("style");
+    element.setAttribute("type", "text/css");
+    element.setAttribute("data-tag-name", tagName.toLowerCase());
+    document.head.insertBefore(element, document.head.firstChild);
+    return element;
+  };
+
+  rewriteFunctionsAsValues = function(definition) {
+    var key, object, value;
+    object = {};
+    for (key in definition) {
+      value = definition[key];
+      object[key] = typeof value === "function" ? {
+        value: value
+      } : value;
+    }
+    return object;
+  };
+
+}).call(this);
+(function() {
+  Trix.extend({
+    getDOMSelection: function() {
+      var selection;
+      selection = window.getSelection();
+      if (selection.rangeCount > 0) {
+        return selection;
+      }
+    },
+    getDOMRange: function() {
+      var ref;
+      return (ref = Trix.getDOMSelection()) != null ? ref.getRangeAt(0) : void 0;
+    },
+    setDOMRange: function(domRange) {
+      var selection;
+      selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(domRange);
+      return Trix.selectionChangeObserver.update();
+    }
+  });
+
+}).call(this);
+(function() {
+
+
+}).call(this);
+(function() {
   var arraysAreEqual,
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty;
@@ -1962,125 +2123,6 @@ window.CustomElements.addModule(function(scope) {
     return Hash;
 
   })(Trix.Object);
-
-}).call(this);
-(function() {
-  var copyValue, normalizeRange, rangeValuesAreEqual;
-
-  Trix.extend({
-    normalizeRange: normalizeRange = function(range) {
-      var ref;
-      if (range == null) {
-        return;
-      }
-      if (!Array.isArray(range)) {
-        range = [range, range];
-      }
-      return [copyValue(range[0]), copyValue((ref = range[1]) != null ? ref : range[0])];
-    },
-    rangeIsCollapsed: function(range) {
-      var end, ref, start;
-      if (range == null) {
-        return;
-      }
-      ref = normalizeRange(range), start = ref[0], end = ref[1];
-      return rangeValuesAreEqual(start, end);
-    },
-    rangesAreEqual: function(leftRange, rightRange) {
-      var leftEnd, leftStart, ref, ref1, rightEnd, rightStart;
-      if (!((leftRange != null) && (rightRange != null))) {
-        return;
-      }
-      ref = normalizeRange(leftRange), leftStart = ref[0], leftEnd = ref[1];
-      ref1 = normalizeRange(rightRange), rightStart = ref1[0], rightEnd = ref1[1];
-      return rangeValuesAreEqual(leftStart, rightStart) && rangeValuesAreEqual(leftEnd, rightEnd);
-    }
-  });
-
-  copyValue = function(value) {
-    if (typeof value === "number") {
-      return value;
-    } else {
-      return Trix.Hash.box(value).toObject();
-    }
-  };
-
-  rangeValuesAreEqual = function(left, right) {
-    if (typeof left === "number") {
-      return left === right;
-    } else {
-      return Trix.Hash.box(left).isEqualTo(Trix.Hash.box(right));
-    }
-  };
-
-}).call(this);
-(function() {
-  var defaults, insertStyleElementForTagName, installDefaultCSSForTagName, rewriteFunctionsAsValues;
-
-  defaults = {
-    extendsTagName: "div",
-    css: "%t { display: block; }"
-  };
-
-  Trix.registerElement = function(tagName, definition) {
-    var constructor, defaultCSS, extendedPrototype, extendsTagName, properties, prototype, ref;
-    if (definition == null) {
-      definition = {};
-    }
-    tagName = tagName.toLowerCase();
-    properties = rewriteFunctionsAsValues(definition);
-    extendsTagName = (ref = properties.extendsTagName) != null ? ref : defaults.extendsTagName;
-    delete properties.extendsTagName;
-    defaultCSS = properties.defaultCSS;
-    delete properties.defaultCSS;
-    if ((defaultCSS != null) && extendsTagName === defaults.extendsTagName) {
-      defaultCSS += "\n" + defaults.css;
-    } else {
-      defaultCSS = defaults.css;
-    }
-    installDefaultCSSForTagName(defaultCSS, tagName);
-    extendedPrototype = Object.getPrototypeOf(document.createElement(extendsTagName));
-    extendedPrototype.__super__ = extendedPrototype;
-    prototype = Object.create(extendedPrototype, properties);
-    constructor = document.registerElement(tagName, {
-      prototype: prototype
-    });
-    Object.defineProperty(prototype, "constructor", {
-      value: constructor
-    });
-    return constructor;
-  };
-
-  installDefaultCSSForTagName = function(defaultCSS, tagName) {
-    var styleElement;
-    styleElement = insertStyleElementForTagName(tagName);
-    return styleElement.textContent = defaultCSS.replace(/%t/g, tagName);
-  };
-
-  insertStyleElementForTagName = function(tagName) {
-    var element;
-    element = document.createElement("style");
-    element.setAttribute("type", "text/css");
-    element.setAttribute("data-tag-name", tagName.toLowerCase());
-    document.head.insertBefore(element, document.head.firstChild);
-    return element;
-  };
-
-  rewriteFunctionsAsValues = function(definition) {
-    var key, object, value;
-    object = {};
-    for (key in definition) {
-      value = definition[key];
-      object[key] = typeof value === "function" ? {
-        value: value
-      } : value;
-    }
-    return object;
-  };
-
-}).call(this);
-(function() {
-
 
 }).call(this);
 (function() {
@@ -2758,6 +2800,51 @@ window.CustomElements.addModule(function(scope) {
 
 }).call(this);
 (function() {
+  var makeElement, prototypes;
+
+  makeElement = Trix.makeElement;
+
+  prototypes = {
+    cursorPoint: makeElement({
+      tagName: "span",
+      data: {
+        trixSelection: true,
+        trixMutable: true,
+        trixSerialize: false
+      }
+    }),
+    cursorTarget: makeElement({
+      tagName: "span",
+      textContent: Trix.ZERO_WIDTH_SPACE,
+      data: {
+        trixSelection: true,
+        trixCursorTarget: true,
+        trixSerialize: false
+      }
+    })
+  };
+
+  Trix.extend({
+    selectionElements: {
+      selector: "[data-trix-selection]",
+      cssText: "font-size: 0 !important;\npadding: 0 !important;\nmargin: 0 !important;\nborder: none !important;",
+      create: function(name) {
+        return prototypes[name].cloneNode(true);
+      },
+      remove: function(element) {
+        var parentElement;
+        parentElement = element.parentElement;
+        parentElement.dataset.trixMutable = true;
+        parentElement.removeChild(element);
+        return defer(function() {
+          return delete parentElement.dataset.trixMutable;
+        });
+      }
+    }
+  });
+
+}).call(this);
+(function() {
 
 
 }).call(this);
@@ -3020,11 +3107,13 @@ window.CustomElements.addModule(function(scope) {
   defer = Trix.defer, findClosestElementFromNode = Trix.findClosestElementFromNode, nodeIsEmptyTextNode = Trix.nodeIsEmptyTextNode, normalizeSpaces = Trix.normalizeSpaces, summarizeStringChange = Trix.summarizeStringChange;
 
   Trix.MutationObserver = (function(superClass) {
-    var mutableSelector, options;
+    var mutableAttributeName, mutableSelector, options;
 
     extend(MutationObserver, superClass);
 
-    mutableSelector = "[data-trix-mutable]";
+    mutableAttributeName = "data-trix-mutable";
+
+    mutableSelector = "[" + mutableAttributeName + "]";
 
     options = {
       attributes: true,
@@ -3092,7 +3181,7 @@ window.CustomElements.addModule(function(scope) {
     };
 
     MutationObserver.prototype.nodeIsSignificant = function(node) {
-      return node !== this.element && !this.nodeIsMutable(node) && !nodeIsEmptyTextNode(node);
+      return (node != null) && node !== this.element && !this.nodeIsMutable(node) && !nodeIsEmptyTextNode(node);
     };
 
     MutationObserver.prototype.nodeIsMutable = function(node) {
@@ -3106,7 +3195,9 @@ window.CustomElements.addModule(function(scope) {
       nodes = [];
       switch (mutation.type) {
         case "attributes":
-          nodes.push(mutation.target);
+          if (mutation.attributeName !== mutableAttributeName) {
+            nodes.push(mutation.target);
+          }
           break;
         case "characterData":
           nodes.push(mutation.target.parentNode);
@@ -3261,12 +3352,12 @@ window.CustomElements.addModule(function(scope) {
 
 }).call(this);
 (function() {
-  var dataTransferIsWritable, defer, extensionForFile, findClosestElementFromNode, findElementFromContainerAndOffset, handleEvent, innerElementIsActive, keyEventIsKeyboardCommand, keyEventIsPasteAndMatchStyleShortcut, keyEventIsWebInspectorShortcut, makeElement, pasteEventIsCrippledSafariHTMLPaste, summarizeStringChange, testTransferData,
+  var dataTransferIsWritable, defer, extensionForFile, findClosestElementFromNode, findElementFromContainerAndOffset, handleEvent, innerElementIsActive, keyEventIsKeyboardCommand, keyEventIsPasteAndMatchStyleShortcut, keyEventIsWebInspectorShortcut, makeElement, objectsAreEqual, pasteEventIsCrippledSafariHTMLPaste, summarizeStringChange, testTransferData,
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
     indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
-  handleEvent = Trix.handleEvent, findClosestElementFromNode = Trix.findClosestElementFromNode, findElementFromContainerAndOffset = Trix.findElementFromContainerAndOffset, defer = Trix.defer, makeElement = Trix.makeElement, innerElementIsActive = Trix.innerElementIsActive, summarizeStringChange = Trix.summarizeStringChange;
+  handleEvent = Trix.handleEvent, findClosestElementFromNode = Trix.findClosestElementFromNode, findElementFromContainerAndOffset = Trix.findElementFromContainerAndOffset, defer = Trix.defer, makeElement = Trix.makeElement, innerElementIsActive = Trix.innerElementIsActive, summarizeStringChange = Trix.summarizeStringChange, objectsAreEqual = Trix.objectsAreEqual;
 
   Trix.InputController = (function(superClass) {
     var pastedFileCount;
@@ -3509,16 +3600,16 @@ window.CustomElements.addModule(function(scope) {
         return (ref1 = this.delegate) != null ? typeof ref1.inputControllerDidStartDrag === "function" ? ref1.inputControllerDidStartDrag() : void 0 : void 0;
       },
       dragover: function(event) {
-        var draggingPoint, ref, ref1;
+        var draggingPoint, ref;
         if (this.draggedRange || this.canAcceptDataTransfer(event.dataTransfer)) {
           event.preventDefault();
           draggingPoint = {
             x: event.clientX,
             y: event.clientY
           };
-          if (draggingPoint.toString() !== ((ref = this.draggingPoint) != null ? ref.toString() : void 0)) {
+          if (!objectsAreEqual(draggingPoint, this.draggingPoint)) {
             this.draggingPoint = draggingPoint;
-            return (ref1 = this.delegate) != null ? typeof ref1.inputControllerDidReceiveDragOverPoint === "function" ? ref1.inputControllerDidReceiveDragOverPoint(this.draggingPoint) : void 0 : void 0;
+            return (ref = this.delegate) != null ? typeof ref.inputControllerDidReceiveDragOverPoint === "function" ? ref.inputControllerDidReceiveDragOverPoint(this.draggingPoint) : void 0 : void 0;
           }
         }
       },
@@ -4113,84 +4204,55 @@ window.CustomElements.addModule(function(scope) {
 
 }).call(this);
 (function() {
-  var MimeTypes, classNames, htmlContainsTagName, makeElement,
+  var classNames, htmlContainsTagName, makeElement, selectionElements,
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty;
 
-  makeElement = Trix.makeElement;
+  makeElement = Trix.makeElement, selectionElements = Trix.selectionElements;
 
   classNames = Trix.config.css.classNames;
-
-  MimeTypes = require("mimetypes");
 
   Trix.AttachmentView = (function(superClass) {
     extend(AttachmentView, superClass);
 
-    AttachmentView.attachmentSelector = "[data-rel=attachment]";
+    AttachmentView.attachmentSelector = "[data-trix-attachment]";
 
     function AttachmentView() {
       AttachmentView.__super__.constructor.apply(this, arguments);
       this.attachment = this.object;
       this.attachment.uploadProgressDelegate = this;
+      this.attachmentPiece = this.options.piece;
     }
 
     AttachmentView.prototype.createContentNodes = function() {
-      var icon, mimeType, title;
-      mimeType = this.attachment.getContentType();
-      icon = makeElement({
-        tagName: "img",
-        attributes: {
-          "class": "fileicon mrm",
-          src: MimeTypes.iconForMimeType(mimeType)
-        }
-      });
-      title = makeElement({
-        tagName: "a",
-        textContent: this.attachment.getFilename(),
-        attributes: {
-          "class": "title",
-          "data-href": this.attachment.getAttribute("url")
-        }
-      });
-      if (MimeTypes.shouldOpenInBrowser(mimeType)) {
-        title.setAttribute("target", "_blank");
-      } else {
-        title.setAttribute("data-mimetype", mimeType);
-        title.setAttribute("download", this.attachment.getFilename());
-      }
-      return [icon, title];
+      return [];
     };
 
     AttachmentView.prototype.createNodes = function() {
-      var comment, data, i, key, len, node, ref, shareItem, value, wrapper;
-      wrapper = makeElement({
-        tagName: "div",
-        attributes: {
-          "class": "attachment-wrapper",
-          contenteditable: false
-        }
+      var attributes, data, element, figure, href, i, key, len, node, ref, value;
+      figure = makeElement({
+        tagName: "figure",
+        className: this.getClassName()
       });
-      comment = document.createComment("block");
-      wrapper.appendChild(comment);
-      shareItem = makeElement({
-        tagName: "div",
-        attributes: {
-          "class": this.getClassName()
-        },
-        data: {
-          eid: this.attachment.getAttribute("eid"),
-          mimeType: this.attachment.getContentType(),
-          rel: "attachment"
+      if (this.attachment.hasContent()) {
+        figure.innerHTML = this.attachment.getContent();
+      } else {
+        ref = this.createContentNodes();
+        for (i = 0, len = ref.length; i < len; i++) {
+          node = ref[i];
+          figure.appendChild(node);
         }
-      });
-      ref = this.createContentNodes();
-      for (i = 0, len = ref.length; i < len; i++) {
-        node = ref[i];
-        shareItem.appendChild(node);
       }
+      figure.appendChild(this.createCaptionElement());
       data = {
+        trixAttachment: JSON.stringify(this.attachment),
+        trixContentType: this.attachment.getContentType(),
         trixId: this.attachment.id
       };
+      attributes = this.attachmentPiece.getAttributesForAttachment();
+      if (!attributes.isEmpty()) {
+        data.trixAttributes = JSON.stringify(attributes);
+      }
       if (this.attachment.isPending()) {
         this.progressElement = makeElement({
           tagName: "progress",
@@ -4204,20 +4266,57 @@ window.CustomElements.addModule(function(scope) {
             trixStoreKey: this.attachment.getCacheKey("progressElement")
           }
         });
-        shareItem.appendChild(this.progressElement);
+        figure.appendChild(this.progressElement);
         data.trixSerialize = false;
+      }
+      if (href = this.getHref()) {
+        element = makeElement("a", {
+          href: href
+        });
+        element.appendChild(figure);
+      } else {
+        element = figure;
       }
       for (key in data) {
         value = data[key];
-        shareItem.dataset[key] = value;
+        element.dataset[key] = value;
       }
-      wrapper.appendChild(shareItem);
-      return [wrapper];
+      element.setAttribute("contenteditable", false);
+      return [selectionElements.create("cursorTarget"), element, selectionElements.create("cursorTarget")];
+    };
+
+    AttachmentView.prototype.createCaptionElement = function() {
+      var caption, figcaption, filename, filesize, span;
+      figcaption = makeElement({
+        tagName: "figcaption",
+        className: classNames.attachment.caption
+      });
+      if (caption = this.attachmentPiece.getCaption()) {
+        figcaption.classList.add(classNames.attachment.captionEdited);
+        figcaption.textContent = caption;
+      } else {
+        if (filename = this.attachment.getFilename()) {
+          figcaption.textContent = filename;
+          if (filesize = this.attachment.getFormattedFilesize()) {
+            figcaption.appendChild(document.createTextNode(" "));
+            span = makeElement({
+              tagName: "span",
+              className: classNames.attachment.size,
+              textContent: filesize
+            });
+            figcaption.appendChild(span);
+          }
+        }
+      }
+      return figcaption;
     };
 
     AttachmentView.prototype.getClassName = function() {
-      var names;
-      names = [Trix.config.blockAttributes.attachment.className, this.attachment.isPreviewable() ? "image" : "file"];
+      var extension, names;
+      names = [classNames.attachment.container, "" + classNames.attachment.typePrefix + (this.attachment.getType())];
+      if (extension = this.attachment.getExtension()) {
+        names.push(extension);
+      }
       return names.join(" ");
     };
 
@@ -4225,17 +4324,6 @@ window.CustomElements.addModule(function(scope) {
       if (!htmlContainsTagName(this.attachment.getContent(), "a")) {
         return this.attachment.getHref();
       }
-    };
-
-    AttachmentView.prototype.createCursorTarget = function() {
-      return makeElement({
-        tagName: "span",
-        textContent: Trix.ZERO_WIDTH_SPACE,
-        data: {
-          trixCursorTarget: true,
-          trixSerialize: false
-        }
-      });
     };
 
     AttachmentView.prototype.findProgressElement = function() {
@@ -7625,7 +7713,7 @@ window.CustomElements.addModule(function(scope) {
     Composition.prototype.replaceHTML = function(html) {
       var document, pointRange;
       document = Trix.Document.fromHTML(html).copyUsingObjectsFromDocument(this.document);
-      pointRange = this.getSelectedPointRange();
+      pointRange = this.getPointRange();
       this.setDocument(document);
       return this.setSelectionPointRange(pointRange);
     };
@@ -7911,7 +7999,7 @@ window.CustomElements.addModule(function(scope) {
       return this.hasCurrentAttribute("frozen");
     };
 
-    Composition.proxyMethod("getSelectionManager().getSelectedPointRange");
+    Composition.proxyMethod("getSelectionManager().getPointRange");
 
     Composition.proxyMethod("getSelectionManager().setLocationRangeFromPointRange");
 
@@ -9036,6 +9124,114 @@ window.CustomElements.addModule(function(scope) {
 
 }).call(this);
 (function() {
+  var defer, findNodeFromContainerAndOffset, getDOMRange, normalizeRange, selectionElements, setDOMRange, tagName,
+    slice = [].slice;
+
+  getDOMRange = Trix.getDOMRange, setDOMRange = Trix.setDOMRange, findNodeFromContainerAndOffset = Trix.findNodeFromContainerAndOffset, tagName = Trix.tagName, selectionElements = Trix.selectionElements, normalizeRange = Trix.normalizeRange, defer = Trix.defer;
+
+  Trix.PointMapper = (function() {
+    var clientRectIsValid, getClientRectForElement;
+
+    function PointMapper() {}
+
+    PointMapper.prototype.findPointRangeFromDOMRange = function(domRange) {
+      var end, points, start;
+      end = this.findPointFromDOMRangeAtIndex(domRange, 1);
+      points = [end];
+      if (!domRange.collapsed) {
+        start = this.findPointFromDOMRangeAtIndex(domRange, 0);
+        points.unshift(start);
+      }
+      return normalizeRange(points);
+    };
+
+    PointMapper.prototype.createDOMRangeFromPoint = function(arg) {
+      var domRange, offset, offsetNode, originalDOMRange, ref, textRange, x, y;
+      x = arg.x, y = arg.y;
+      if (document.caretPositionFromPoint) {
+        ref = document.caretPositionFromPoint(x, y), offsetNode = ref.offsetNode, offset = ref.offset;
+        domRange = document.createRange();
+        domRange.setStart(offsetNode, offset);
+        return domRange;
+      } else if (document.caretRangeFromPoint) {
+        return document.caretRangeFromPoint(x, y);
+      } else if (document.body.createTextRange) {
+        originalDOMRange = getDOMRange();
+        try {
+          textRange = document.body.createTextRange();
+          textRange.moveToPoint(x, y);
+          textRange.select();
+        } catch (_error) {}
+        domRange = getDOMRange();
+        setDOMRange(originalDOMRange);
+        return domRange;
+      }
+    };
+
+    PointMapper.prototype.getClientRectsForDOMRange = function(domRange) {
+      var end, ref, start;
+      ref = slice.call(domRange.getClientRects()), start = ref[0], end = ref[ref.length - 1];
+      return [start, end];
+    };
+
+    PointMapper.prototype.findPointFromDOMRangeAtIndex = function(domRange, index) {
+      var element, rect, side, x, y;
+      domRange = domRange.cloneRange();
+      side = index === 0 ? "start" : "end";
+      element = findNodeFromContainerAndOffset(domRange[side + "Container"], domRange[side + "Offset"]);
+      if (tagName(element) === "br") {
+        rect = getClientRectForElement(element);
+        if (rect == null) {
+          rect = this.getClientRectsForDOMRange(domRange)[index];
+        }
+        if (rect) {
+          x = rect.left;
+          y = rect.bottom;
+        }
+      } else {
+        element = selectionElements.create("cursorPoint");
+        if (side === "end") {
+          domRange.collapse(false);
+        }
+        domRange.insertNode(element);
+        rect = element.getBoundingClientRect();
+        selectionElements.remove(element);
+        x = rect.left - index;
+        y = rect.top + 1;
+      }
+      if ((x != null) && (y != null)) {
+        return {
+          x: x,
+          y: y
+        };
+      }
+    };
+
+    getClientRectForElement = function(element) {
+      var rect;
+      rect = element.getBoundingClientRect();
+      if (clientRectIsValid(rect)) {
+        return rect;
+      }
+    };
+
+    clientRectIsValid = function(rect) {
+      var key, value;
+      for (key in rect) {
+        value = rect[key];
+        if (Math.abs(value)) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    return PointMapper;
+
+  })();
+
+}).call(this);
+(function() {
   var bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
@@ -9150,17 +9346,14 @@ window.CustomElements.addModule(function(scope) {
 
 }).call(this);
 (function() {
-  var defer, elementContainsNode, handleEvent, handleEventOnce, innerElementIsActive, makeElement, nodeIsCursorTarget, normalizeRange, rangeIsCollapsed, rangesAreEqual,
+  var defer, elementContainsNode, getDOMRange, getDOMSelection, handleEvent, handleEventOnce, innerElementIsActive, nodeIsCursorTarget, normalizeRange, rangeIsCollapsed, rangesAreEqual, setDOMRange,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
-    hasProp = {}.hasOwnProperty,
-    slice = [].slice;
+    hasProp = {}.hasOwnProperty;
 
-  defer = Trix.defer, elementContainsNode = Trix.elementContainsNode, nodeIsCursorTarget = Trix.nodeIsCursorTarget, innerElementIsActive = Trix.innerElementIsActive, makeElement = Trix.makeElement, handleEvent = Trix.handleEvent, handleEventOnce = Trix.handleEventOnce, normalizeRange = Trix.normalizeRange, rangeIsCollapsed = Trix.rangeIsCollapsed, rangesAreEqual = Trix.rangesAreEqual;
+  getDOMSelection = Trix.getDOMSelection, getDOMRange = Trix.getDOMRange, setDOMRange = Trix.setDOMRange, defer = Trix.defer, elementContainsNode = Trix.elementContainsNode, nodeIsCursorTarget = Trix.nodeIsCursorTarget, innerElementIsActive = Trix.innerElementIsActive, handleEvent = Trix.handleEvent, handleEventOnce = Trix.handleEventOnce, normalizeRange = Trix.normalizeRange, rangeIsCollapsed = Trix.rangeIsCollapsed, rangesAreEqual = Trix.rangesAreEqual;
 
   Trix.SelectionManager = (function(superClass) {
-    var cursorPositionPlaceholder, getClientRects, getCollapsedPointRange, getDOMRange, getDOMSelection, getExpandedPointRange, setDOMRange;
-
     extend(SelectionManager, superClass);
 
     function SelectionManager(element) {
@@ -9168,6 +9361,7 @@ window.CustomElements.addModule(function(scope) {
       this.selectionDidChange = bind(this.selectionDidChange, this);
       this.didMouseDown = bind(this.didMouseDown, this);
       this.locationMapper = new Trix.LocationMapper(this.element);
+      this.pointMapper = new Trix.PointMapper;
       this.lockCount = 0;
       handleEvent("mousedown", {
         onElement: this.element,
@@ -9195,24 +9389,25 @@ window.CustomElements.addModule(function(scope) {
       }
     };
 
-    SelectionManager.prototype.getSelectedPointRange = function() {
-      var ref;
-      return (ref = getExpandedPointRange()) != null ? ref : getCollapsedPointRange();
+    SelectionManager.prototype.getPointRange = function() {
+      var domRange;
+      if (domRange = getDOMRange()) {
+        return this.findPointRangeFromDOMRange(domRange);
+      }
     };
 
     SelectionManager.prototype.setLocationRangeFromPointRange = function(pointRange) {
-      var endLocation, ref, ref1, startLocation;
+      var endLocation, startLocation;
       pointRange = normalizeRange(pointRange);
-      startLocation = (ref = this.getLocationRangeAtPoint(pointRange[0])) != null ? ref[0] : void 0;
-      endLocation = (ref1 = this.getLocationRangeAtPoint(pointRange[1])) != null ? ref1[0] : void 0;
+      startLocation = this.getLocationAtPoint(pointRange[0]);
+      endLocation = this.getLocationAtPoint(pointRange[1]);
       return this.setLocationRange([startLocation, endLocation]);
     };
 
     SelectionManager.prototype.getClientRectAtLocationRange = function(locationRange) {
-      var range, rects;
-      if (range = this.createDOMRangeFromLocationRange(locationRange)) {
-        rects = slice.call(range.getClientRects());
-        return rects.slice(-1)[0];
+      var domRange;
+      if (domRange = this.createDOMRangeFromLocationRange(locationRange)) {
+        return this.getClientRectsForDOMRange(domRange)[1];
       }
     };
 
@@ -9259,6 +9454,12 @@ window.CustomElements.addModule(function(scope) {
     SelectionManager.proxyMethod("locationMapper.findContainerAndOffsetFromLocation");
 
     SelectionManager.proxyMethod("locationMapper.findNodeAndOffsetFromLocation");
+
+    SelectionManager.proxyMethod("pointMapper.findPointRangeFromDOMRange");
+
+    SelectionManager.proxyMethod("pointMapper.createDOMRangeFromPoint");
+
+    SelectionManager.proxyMethod("pointMapper.getClientRectsForDOMRange");
 
     SelectionManager.prototype.didMouseDown = function() {
       return this.pauseTemporarily();
@@ -9340,110 +9541,18 @@ window.CustomElements.addModule(function(scope) {
       return normalizeRange([start, end]);
     };
 
+    SelectionManager.prototype.getLocationAtPoint = function(point) {
+      var domRange, ref;
+      if (domRange = this.createDOMRangeFromPoint(point)) {
+        return (ref = this.createLocationRangeFromDOMRange(domRange)) != null ? ref[0] : void 0;
+      }
+    };
+
     SelectionManager.prototype.domRangeWithinElement = function(domRange) {
       if (domRange.collapsed) {
         return elementContainsNode(this.element, domRange.startContainer);
       } else {
         return elementContainsNode(this.element, domRange.startContainer) && elementContainsNode(this.element, domRange.endContainer);
-      }
-    };
-
-    SelectionManager.prototype.getLocationRangeAtPoint = function(arg) {
-      var domRange, offset, offsetNode, ref, x, y;
-      x = arg.x, y = arg.y;
-      if (document.caretPositionFromPoint) {
-        ref = document.caretPositionFromPoint(x, y), offsetNode = ref.offsetNode, offset = ref.offset;
-        domRange = document.createRange();
-        domRange.setStart(offsetNode, offset);
-      } else if (document.caretRangeFromPoint) {
-        domRange = document.caretRangeFromPoint(x, y);
-      } else if (document.body.createTextRange) {
-        try {
-          domRange = document.body.createTextRange();
-          domRange.moveToPoint(clientX, clientY);
-          domRange.select();
-        } catch (_error) {}
-      }
-      return this.createLocationRangeFromDOMRange(domRange != null ? domRange : getDOMRange());
-    };
-
-    cursorPositionPlaceholder = makeElement({
-      tagName: "span",
-      style: {
-        marginLeft: "-0.01em"
-      },
-      data: {
-        trixMutable: true,
-        trixSerialize: false
-      }
-    });
-
-    getCollapsedPointRange = function() {
-      var domRange, node, rect, start;
-      if (!(domRange = getDOMRange())) {
-        return;
-      }
-      node = cursorPositionPlaceholder.cloneNode(true);
-      try {
-        domRange.insertNode(node);
-        rect = node.getBoundingClientRect();
-      } finally {
-        node.parentNode.removeChild(node);
-      }
-      start = {
-        x: rect.left,
-        y: rect.top + 1
-      };
-      return normalizeRange(start);
-    };
-
-    getExpandedPointRange = function() {
-      var domRange, end, endRect, rects, start, startRect;
-      if (!(domRange = getDOMRange())) {
-        return;
-      }
-      rects = domRange.getClientRects();
-      if (rects.length > 0) {
-        startRect = rects[0];
-        endRect = rects[rects.length - 1];
-        start = {
-          x: startRect.left,
-          y: startRect.top + 1
-        };
-        end = {
-          x: endRect.right,
-          y: endRect.top + 1
-        };
-        return normalizeRange(start, end);
-      }
-    };
-
-    getDOMSelection = function() {
-      var selection;
-      selection = window.getSelection();
-      if (selection.rangeCount > 0) {
-        return selection;
-      }
-    };
-
-    getDOMRange = function() {
-      var ref;
-      return (ref = getDOMSelection()) != null ? ref.getRangeAt(0) : void 0;
-    };
-
-    setDOMRange = function(domRange) {
-      var selection;
-      selection = window.getSelection();
-      selection.removeAllRanges();
-      selection.addRange(domRange);
-      return Trix.selectionChangeObserver.update();
-    };
-
-    getClientRects = function() {
-      var rects, ref;
-      rects = (ref = getDOMRange()) != null ? ref.getClientRects() : void 0;
-      if (rects != null ? rects.length : void 0) {
-        return rects;
       }
     };
 
@@ -9936,9 +10045,9 @@ window.CustomElements.addModule(function(scope) {
 
 }).call(this);
 (function() {
-  var attachmentSelector, defer, handleEvent, handleEventOnce, makeElement, triggerEvent;
+  var attachmentSelector, defer, handleEvent, handleEventOnce, makeElement, selectionElements, triggerEvent;
 
-  makeElement = Trix.makeElement, triggerEvent = Trix.triggerEvent, handleEvent = Trix.handleEvent, handleEventOnce = Trix.handleEventOnce, defer = Trix.defer;
+  makeElement = Trix.makeElement, selectionElements = Trix.selectionElements, triggerEvent = Trix.triggerEvent, handleEvent = Trix.handleEvent, handleEventOnce = Trix.handleEventOnce, defer = Trix.defer;
 
   attachmentSelector = Trix.AttachmentView.attachmentSelector;
 
@@ -9987,7 +10096,7 @@ window.CustomElements.addModule(function(scope) {
       }
     };
     return {
-      defaultCSS: "%t:empty:not(:focus)::before {\n  content: attr(placeholder);\n  color: graytext;\n}\n\n%t a[contenteditable=false] {\n  cursor: text;\n}\n\n%t img {\n  max-width: 100%;\n  height: auto;\n}\n\n%t " + attachmentSelector + " figcaption textarea {\n  resize: none;\n}\n\n%t " + attachmentSelector + " figcaption textarea.trix-autoresize-clone {\n  position: absolute;\n  left: -9999px;\n  max-height: 0px;\n}",
+      defaultCSS: "%t:empty:not(:focus)::before {\n  content: attr(placeholder);\n  color: graytext;\n}\n\n%t a[contenteditable=false] {\n  cursor: text;\n}\n\n%t img {\n  max-width: 100%;\n  height: auto;\n}\n\n%t " + attachmentSelector + " figcaption textarea {\n  resize: none;\n}\n\n%t " + attachmentSelector + " figcaption textarea.trix-autoresize-clone {\n  position: absolute;\n  left: -9999px;\n  max-height: 0px;\n}\n\n%t " + selectionElements.selector + " { " + selectionElements.cssText + " }",
       trixId: {
         get: function() {
           if (this.hasAttribute("trix-id")) {
