@@ -1581,9 +1581,9 @@
 
 }).call(this);
 (function() {
-  var makeElement, prototypes;
+  var defer, makeElement, prototypes;
 
-  makeElement = Trix.makeElement;
+  makeElement = Trix.makeElement, defer = Trix.defer;
 
   prototypes = {
     cursorPoint: makeElement({
