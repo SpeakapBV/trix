@@ -1,5 +1,5 @@
 {
-  "name": "trix",
+  "name": "trix",  
   "version": "0.9.2",
   "description": "A rich text editor for everyday writing",
   "main": "dist/trix.js",
